@@ -25,12 +25,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+//TODO:поворот камеры
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener {
 
     private CameraBridgeViewBase camera;
     private CascadeClassifier classifier;
     private Mat grayScaleImage;
     private int faceSize;
+    private int frontStyle=1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +40,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         setContentView(R.layout.activity_main);
         applyScreenSettings();
         camera = (JavaCameraView)findViewById(R.id.camera);
+        camera.setCameraIndex(frontStyle);
         camera.setCvCameraViewListener(this);
         if (libReady()){
             initClassifier();
