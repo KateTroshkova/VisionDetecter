@@ -8,7 +8,7 @@
     android:layout_height="match_parent"
     tools:context="com.troshkova.portfolioprogect.visiondetector.MainActivity">
 
-    <org.opencv.android.JavaCameraView
+    <com.troshkova.portfolioprogect.visiondetector.SmartCamera
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/camera"
