@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.util.AttributeSet;
+import android.view.Surface;
 import android.view.WindowManager;
 
 import com.troshkova.portfolioprogect.visiondetector.exception.Exception;
@@ -20,6 +21,7 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
+//TODO view direction, hand rotate
 public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.CvCameraViewListener{
 
     private FaceClassifier faceClassifier;
@@ -76,6 +78,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
 
     @Override
     public Mat onCameraFrame(Mat inputFrame) {
+        fixOrientation(inputFrame);
         Imgproc.cvtColor(inputFrame, grayScaleImage, Imgproc.COLOR_RGBA2GRAY);
         Rect[] faces=null;
         if (faceClassifier.isExist()) {
@@ -83,7 +86,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         }
         if (faces!=null) {
             if (faces.length < 1) {
-                listener.onCameraExceptionListener(Exception.EXCEPTION_NO_FACE);
+        listener.onCameraExceptionListener(Exception.EXCEPTION_NO_FACE);
             }
             if (faces.length > 1) {
                 listener.onCameraExceptionListener(Exception.EXCEPTION_MANY_FACES);
@@ -93,6 +96,47 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             }
         }
         return inputFrame;
+    }
+
+    public void mirror(Mat mat){
+        Core.flip(mat, mat, 0);
+        Core.rotate(mat, mat, Core.ROTATE_180);
+    }
+
+    public void rotateP90(Mat mat){
+        Core.transpose(mat, mat);
+        setWidth(mat.cols());
+        setHeight(mat.rows());
+    }
+
+    public void rotateM90(Mat mat){
+        rotateP90(mat);
+        Core.flip(mat, mat, 0);
+    }
+
+    public void rotate180(Mat mat){
+        Core.rotate(mat, mat, Core.ROTATE_180);
+    }
+
+    private void fixOrientation(Mat mat){
+        mirror(mat);
+        WindowManager windowManager= (WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE);
+        int rotation = windowManager.getDefaultDisplay().getRotation();
+        switch (rotation) {
+            case Surface.ROTATION_0: {
+                rotateM90(mat);
+                break;
+            }
+            case Surface.ROTATION_90:
+                break;
+            case Surface.ROTATION_180: {
+                rotateM90(mat);
+                break;
+            }
+            case Surface.ROTATION_270:
+                rotate180(mat);
+                break;
+        }
     }
 
     private void drawFace(Mat inputFrame, Rect face){

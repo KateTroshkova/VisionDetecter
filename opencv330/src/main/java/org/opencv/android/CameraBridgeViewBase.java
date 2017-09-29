@@ -56,6 +56,17 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
     public static final int RGBA = 1;
     public static final int GRAY = 2;
 
+    //TODO: методы добавлены искусственно. Насильно изменяют высоту и ширину изображения
+    //mFrameWidth и mFrameHeight используются ниже для создания Bitmap
+    //Bitmap-для вывода изображения на экран
+    //Необходимы, так как иначе возникает конфликт размеров mat и bitmap
+    public void setWidth(int width){
+        this.mFrameWidth=width;
+    }
+    public void setHeight(int height){
+        this.mFrameHeight=height;
+    }
+
     public CameraBridgeViewBase(Context context, int cameraId) {
         super(context);
         mCameraIndex = cameraId;
@@ -108,7 +119,6 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         /**
          * This method is invoked when delivery of the frame needs to be done.
          * The returned values - is a modified frame which needs to be displayed on the screen.
-         * TODO: pass the parameters specifying the format of the frame (BPP, YUV or RGB and etc)
          */
         public Mat onCameraFrame(Mat inputFrame);
     }
@@ -131,7 +141,6 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         /**
          * This method is invoked when delivery of the frame needs to be done.
          * The returned values - is a modified frame which needs to be displayed on the screen.
-         * TODO: pass the parameters specifying the format of the frame (BPP, YUV or RGB and etc)
          */
         public Mat onCameraFrame(CvCameraViewFrame inputFrame);
     };
@@ -397,6 +406,8 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         boolean bmpValid = true;
         if (modified != null) {
             try {
+                //TODO: пересоздание bitmap с подходящими размерами
+                mCacheBitmap = Bitmap.createBitmap(mFrameWidth, mFrameHeight, Bitmap.Config.ARGB_8888);
                 Utils.matToBitmap(modified, mCacheBitmap);
             } catch(Exception e) {
                 Log.e(TAG, "Mat type: " + modified);
