@@ -21,7 +21,9 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
-//TODO view direction, hand rotate
+import java.util.ArrayList;
+
+//TODO стабильная область глаз
 public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.CvCameraViewListener{
 
     //классификатор, распознающий лицо и глаза
@@ -53,20 +55,12 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         void onCameraExceptionListener(Exception exception);
     }
 
-    //уничтожение камеры
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         disableView();
     }
 
-    //инициализация переменных
-    //проверка условий работоспособности(наличие камеры и фронтальной камеры)
-    //скрытие кнопок и action bar
-    //запуск opencv
-    //инициализация классификатора
-    //включение камеры
-    //любое исключение в этом списке выбрасывается в активность
     public SmartCamera(Context context, AttributeSet attrs) {
         super(context, attrs);
         this.parent=(Activity)getContext();
@@ -92,27 +86,17 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         }
     }
 
-    //вызывается при старте и смене ориентации
-    //подгоняет размер черно-белой матрицы под требования экрана
-    //вычисляет ожидаемый размер лица (20 % от высоты)
     @Override
     public void onCameraViewStarted(int width, int height) {
         grayScaleImage = new Mat(height, width, CvType.CV_8UC4);
         faceSize = (int) (height * 0.2);
     }
 
-    //остановка камеры и освобождение ресурсов
     @Override
     public void onCameraViewStopped() {
         grayScaleImage.release();
     }
 
-    //обновление камеры (вызывается постоянно)
-    //исправляет поворот изображения
-    //переводит цветной кадр в черно-белый
-    //получает список лиц
-    //при отсутствии/наличии нескольких лиц выбрасывает исключение в активность
-    //отрисовывает лицо
     //TODO:fix hand rotation
     @Override
     public Mat onCameraFrame(Mat inputFrame) {
@@ -179,10 +163,6 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         Core.rotate(mat, mat, Core.ROTATE_180);
     }
 
-    //экспериментальная зависимость для большинства устройств
-    //в любом случае зеркально отражает по горизонтали
-    //получает данные о повороте устройства
-    //в зависимости от угла поворота переворачивает изображение
     private void fixOrientation(Mat mat){
         mirror(mat);
         WindowManager windowManager= (WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE);
@@ -204,42 +184,48 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         }
     }
 
-    //рисует прямоугольник вокруг лица
-    //выделяет области, где должны находится глаза
-    //рисует зрачки
     private void drawFace(Mat inputFrame, Rect face){
-        Imgproc.rectangle(inputFrame, face.tl(), face.br(), new Scalar(0.0, 255.0, 0.0, 255.0), 3);
         Rect right = new Rect(face.x + face.width / 16, (int) (face.y + (face.height / 4.5)),
                 (face.width - 2 * face.width / 16) / 2, (int) (face.height / 3.0));
         Rect left = new Rect(face.x + face.width / 16 + (face.width - 2 * face.width / 16) / 2,
                 (int) (face.y + (face.height / 4.5)), (face.width - 2 * face.width / 16) / 2, (int) (face.height / 3.0));
-        Imgproc.rectangle(inputFrame, left.tl(), left.br(),
-                new Scalar(0, 255, 0, 255), 2);
-        Imgproc.rectangle(inputFrame, right.tl(), right.br(),
-                new Scalar(0, 255, 0, 255), 2);
-        drawTemplate(inputFrame, right);
-        drawTemplate(inputFrame, left);
+        Line rightLine = drawTemplate(inputFrame, right);
+        Line leftLine = drawTemplate(inputFrame, left);
+        if (rightLine!=null && leftLine!=null) {
+            Point bigPoint = rightLine.intersect(leftLine);
+            Imgproc.circle(inputFrame, bigPoint, 10, new Scalar(255, 255, 255, 255));
+        }
     }
 
-    private void drawTemplate(Mat inputMat, Rect area) {
+    private Line drawTemplate(Mat inputMat, Rect area) {
         Point template = new Point();
         Rect[] eyesArray = faceClassifier.getEyes(grayScaleImage, area);
-
-        for (Rect eye:eyesArray) {
+        Line result=null;
+        for (Rect eye : eyesArray) {
             eye.x = area.x + eye.x;
             eye.y = area.y + eye.y;
             Rect eyeRectangle = new Rect((int) eye.tl().x, (int) (eye.tl().y + eye.height * 0.4), eye.width, (int) (eye.height * 0.6));
 
-            Core.MinMaxLocResult mmG = Core.minMaxLoc(grayScaleImage.submat(eyeRectangle));
+            double x = eye.tl().x + (eye.width) / 2;
+            double y = (eye.tl().y + eye.height * 0.4) + (eye.height * 0.6) / 2;
 
-            Imgproc.circle(inputMat.submat(eyeRectangle), mmG.minLoc, 2, new Scalar(255, 0, 0, 255), 2);
+            Core.MinMaxLocResult mmG = Core.minMaxLoc(grayScaleImage.submat(eyeRectangle));
 
             template.x = mmG.minLoc.x + eyeRectangle.x;
             template.y = mmG.minLoc.y + eyeRectangle.y;
 
-            Rect eyeTemplate = new Rect((int) template.x - 24 / 2, (int) template.y - 24 / 2, 24, 24);
-            Imgproc.rectangle(inputMat, eyeTemplate.tl(), eyeTemplate.br(), new Scalar(0, 255, 0, 255), 2);
+            double slope = (double) (y - template.y) / (x - template.x);
+
+            Point p = new Point(0, 0);
+            Point q = new Point(inputMat.cols(), inputMat.rows());
+
+            p.y = -(template.x - p.x) * slope + template.y;
+            q.y = -(x - q.x) * slope + y;
+
+            Imgproc.line(inputMat, p, q, new Scalar(0, 0, 255, 255), 1, 8, 0);
+            result=new Line(p, q);
         }
+        return result;
     }
 
     private boolean hasCamera(){

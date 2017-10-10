@@ -36,8 +36,8 @@ public class FaceClassifier {
             classifier = new CascadeClassifier(path);
         }
         String eyePath=rewriteEyeDataSource();
-        if (eyePath!=null){
-            eyeClassifier=new CascadeClassifier(eyePath);
+        if (eyePath!=null) {
+            eyeClassifier = new CascadeClassifier(eyePath);
         }
     }
 
@@ -85,9 +85,9 @@ public class FaceClassifier {
 
     private String rewriteEyeDataSource(){
         try {
-            InputStream einput = context.getResources().openRawResource(R.raw.haarcascade_lefteye_2splits);
+            InputStream einput = context.getResources().openRawResource(R.raw.haarcascade_eye);
             File eyeDir = context.getDir("cascadeER", Context.MODE_PRIVATE);
-            File eyeFile = new File(eyeDir, "haarcascade_eye_right.xml");
+            File eyeFile = new File(eyeDir, "haarcascade_eye.xml");
             FileOutputStream eoutput = new FileOutputStream(eyeFile);
 
             byte[] ebuffer = new byte[4096];
@@ -98,11 +98,9 @@ public class FaceClassifier {
             einput.close();
             eoutput.close();
             return eyeFile.getAbsolutePath();
-        }
-        catch(FileNotFoundException e){
+        } catch(FileNotFoundException e){
             listener.onCameraExceptionListener(Exception.EXCEPTION_NO_FILE);
-        }
-        catch(IOException e){
+        } catch(IOException e){
             listener.onCameraExceptionListener(Exception.EXCEPTION_IO);
         }
         return null;
