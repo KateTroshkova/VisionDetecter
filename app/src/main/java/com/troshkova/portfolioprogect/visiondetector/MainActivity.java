@@ -6,7 +6,10 @@ import android.util.Log;
 
 import com.troshkova.portfolioprogect.visiondetector.exception.Exception;
 
-public class MainActivity extends AppCompatActivity implements SmartCamera.OnCameraExceptionListener {
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+
+public class MainActivity extends AppCompatActivity implements SmartCamera.OnCameraExceptionListener, SmartCamera.OnDetectSightListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -17,5 +20,11 @@ public class MainActivity extends AppCompatActivity implements SmartCamera.OnCam
     @Override
     public void onCameraExceptionListener(Exception exception) {
         Log.e("LOG", exception.toString());
+    }
+
+    @Override
+    public void onDetectSight(Point sight, Rect region) {
+        //экспериментально выяснила, что координаты на камере во весь экран без погрешностей.
+        //учесть погрешность при изменении размера и положения камеры
     }
 }
