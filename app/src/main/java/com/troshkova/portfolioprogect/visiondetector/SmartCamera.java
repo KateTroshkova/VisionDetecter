@@ -2,6 +2,7 @@ package com.troshkova.portfolioprogect.visiondetector;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
 import android.util.AttributeSet;
@@ -53,6 +54,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     //связаны с найденной областью
     private Rect error=new Rect();
 
+
+    private int rotate=0;
+    private boolean mirror=false;
+
     public interface OnCameraExceptionListener{
         void onCameraExceptionListener(Exception exception);
     }
@@ -89,6 +94,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         else{
             listener.onCameraExceptionListener(Exception.EXCEPTION_NO_CAMERA);
         }
+
+        SharedPreferences preferences=getContext().getSharedPreferences("preference_name", getContext().MODE_PRIVATE);
+        mirror=preferences.getBoolean("mirror", false);
+        rotate=preferences.getInt("rotation", 0);
     }
 
     //внешний интерфейс
@@ -103,11 +112,32 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         rightPriority=priority;
     }
 
+    public void addRotation(){
+        rotate++;
+        SharedPreferences preferences=getContext().getSharedPreferences("preference_name", getContext().MODE_PRIVATE);
+        SharedPreferences.Editor editor=preferences.edit();
+        editor.putInt("rotation", rotate%4);
+        editor.apply();
+    }
+
+    public void mirror(){
+        mirror=!mirror;
+        SharedPreferences preferences=getContext().getSharedPreferences("preference_name", getContext().MODE_PRIVATE);
+        SharedPreferences.Editor editor=preferences.edit();
+        editor.putBoolean("mirror", mirror);
+        editor.apply();
+    }
+
     //уничтожение камеры
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         disableView();
+        SharedPreferences preferences=getContext().getSharedPreferences("preference_name", getContext().MODE_PRIVATE);
+        SharedPreferences.Editor editor=preferences.edit();
+        editor.putBoolean("mirror", mirror);
+        editor.putInt("rotation", rotate%4);
+        editor.apply();
     }
 
     @Override
@@ -185,6 +215,12 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             default:{
                 listener.onCameraExceptionListener(Exception.EXCEPTION_STRANGE_ORIENTATION);
             }
+        }
+        for(int i=0; i<rotate; i++){
+            rotateM90(mat);
+        }
+        if (mirror){
+            mirror(mat);
         }
     }
 
