@@ -26,6 +26,7 @@ public class MainActivity extends AppCompatActivity implements SmartCamera.OnCam
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         camera=(SmartCamera)findViewById(R.id.camera);
+        camera.setRendering(true);
     }
 
     @Override
