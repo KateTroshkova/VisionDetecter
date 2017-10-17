@@ -2,8 +2,6 @@ package com.troshkova.portfolioprogect.visiondetector;
 
 import android.content.Context;
 
-import com.troshkova.portfolioprogect.visiondetector.exception.Exception;
-
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Rect;
@@ -72,10 +70,14 @@ public class FaceClassifier {
             return outputFile.getAbsolutePath();
         }
         catch(FileNotFoundException e){
-            listener.onCameraExceptionListener(Exception.EXCEPTION_NO_FILE);
+            if (listener!=null) {
+                listener.onCameraExceptionListener(SmartCamera.Exception.EXCEPTION_NO_FILE);
+            }
         }
         catch(IOException e){
-            listener.onCameraExceptionListener(Exception.EXCEPTION_IO);
+            if (listener!=null) {
+                listener.onCameraExceptionListener(SmartCamera.Exception.EXCEPTION_IO);
+            }
         }
         return null;
     }
