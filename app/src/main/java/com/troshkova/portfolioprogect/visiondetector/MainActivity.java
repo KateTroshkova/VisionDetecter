@@ -48,6 +48,6 @@ public class MainActivity extends AppCompatActivity implements SmartCamera.OnCam
 
     @Override
     public void onCameraExceptionListener(@SmartCamera.Exception int exception) {
-        Log.e("LAG", exception+"");
+        Log.e("LOG", exception+"");
     }
 }
