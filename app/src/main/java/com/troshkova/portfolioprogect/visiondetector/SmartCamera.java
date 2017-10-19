@@ -23,6 +23,7 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import java.lang.annotation.Retention;
+import java.util.ArrayList;
 
 import static android.view.Surface.ROTATION_0;
 import static android.view.Surface.ROTATION_180;
@@ -52,6 +53,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     private OnCameraExceptionListener mExceptionListener = null;
     //интерфейс, через который активность получает точку, на которую смотрит пользователь
     private OnEyeDirectionListener mSightListener = null;
+
+    private ArrayList<Point> mOptions;
+
+    private Point up, down, right, left, center;
 
     //если true будет происходить построение дополнительных линий
     private boolean debug = true;
@@ -83,6 +88,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
      * загрузка/подготовка open_cv
      */
     public void startCamera() {
+        mOptions=new ArrayList<>();
         if (!hasCamera()) {
             callException(EXCEPTION_NO_CAMERA);
             return;
@@ -166,12 +172,21 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     @Override
     public Mat onCameraFrame(Mat inputFrame) {
         fixOrientation(inputFrame);
+        initControlPoints(inputFrame);
         mGrayMat = new Mat(inputFrame.rows(), inputFrame.cols(), CvType.CV_8UC4);
         Imgproc.cvtColor(inputFrame, mGrayMat, Imgproc.COLOR_RGBA2GRAY);
         userAttention(inputFrame);
         mGrayMat.release();
         mCurrentMat=inputFrame;
         return inputFrame;
+    }
+
+    private void initControlPoints(Mat image){
+        up=new Point(image.cols()/2, 0);
+        down=new Point(image.cols()/2, image.rows());
+        right=new Point(image.cols(), image.rows()/2);
+        left=new Point(0, image.rows()/2);
+        center=new Point(image.cols()/2, image.rows()/2);
     }
 
     //отражение по горизонтали
@@ -271,15 +286,60 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             }
             Rect error = new Rect((int) (attention.x - inputFrame.cols() / 4), (int) (attention.y - inputFrame.rows() / 4),
                     inputFrame.cols() / 2, inputFrame.rows() / 2);
-            onEyeEvent(attention, error);
+            if (mOptions.size()>=10){
+                attention=oneNearest(average());
+                onEyeEvent(attention, error);
+                mOptions.clear();
+                Imgproc.circle(inputFrame, attention, 3, new Scalar(255, 255, 255, 255), 3);
+                Imgproc.rectangle(inputFrame, error.tl(), error.br(), new Scalar(255, 255, 255, 128));
+            }
+            else{
+                mOptions.add(attention);
+            }
             if (debug) {
                 Imgproc.rectangle(inputFrame, face.tl(), face.br(), new Scalar(0, 255, 255, 255));
                 Imgproc.rectangle(inputFrame, rightRegion.tl(), rightRegion.br(), new Scalar(0, 255, 128, 255));
                 Imgproc.rectangle(inputFrame, leftRegion.tl(), leftRegion.br(), new Scalar(0, 255, 128, 255));
-                Imgproc.circle(inputFrame, attention, 3, new Scalar(255, 255, 255, 255), 3);
-                Imgproc.rectangle(inputFrame, error.tl(), error.br(), new Scalar(255, 255, 255, 128));
             }
         }
+    }
+
+    private Point oneNearest(Point attension){
+        double distanceUp=distance(attension, up);
+        double distanceDown=distance(attension, down);
+        double distanceRight=distance(attension, right);
+        double distanceLeft=distance(attension, down);
+        double distanceCenter=distance(attension, center);
+        if (distanceUp <= distanceDown && distanceUp<=distanceRight && distanceUp<=distanceLeft && distanceUp<=distanceCenter){
+            return up;
+        }
+        if (distanceDown <= distanceUp && distanceDown<=distanceRight && distanceDown<=distanceLeft && distanceDown<=distanceCenter){
+            return down;
+        }
+        if (distanceRight <= distanceUp && distanceRight<=distanceDown && distanceRight<=distanceLeft && distanceRight<=distanceCenter){
+            return right;
+        }
+        if (distanceLeft <= distanceUp && distanceLeft<=distanceDown && distanceLeft<=distanceRight && distanceLeft<=distanceCenter){
+            return left;
+        }
+        if (distanceCenter <= distanceUp && distanceCenter<=distanceDown && distanceCenter<=distanceRight && distanceCenter<=distanceLeft){
+            return center;
+        }
+        return null;
+    }
+
+    private double distance(Point a, Point b){
+        return Math.sqrt((b.x-a.x)*(b.x-a.x)+(b.y-a.y)*(b.y-a.y));
+    }
+
+    private Point average(){
+        float x=0;
+        float y=0;
+        for(Point point:mOptions){
+            x+=point.x;
+            y+=point.y;
+        }
+        return new Point(x/mOptions.size(), y/mOptions.size());
     }
 
     //определяет четверть, в которой находится направление взгляда
