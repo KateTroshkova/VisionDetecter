@@ -30,6 +30,7 @@ import static android.view.Surface.ROTATION_180;
 import static android.view.Surface.ROTATION_270;
 import static android.view.Surface.ROTATION_90;
 import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_LIB_NOT_READY;
+import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_LITTLE_LIGHT;
 import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_MANY_EYES;
 import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_MANY_FACES;
 import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_NO_CAMERA;
@@ -61,9 +62,13 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     //если true будет происходить построение дополнительных линий
     private boolean debug = true;
 
+    private boolean light=false;
+
     private boolean mIsStarting = false;
 
     private Mat mCurrentMat;
+
+    private Rect error;
 
     //количество дополнительных поворотов(пользовательские настройки)
     @Rotation
@@ -141,6 +146,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         mMirror = isMirror;
     }
 
+    public void checkLight(boolean light){
+        this.light=light;
+    }
+
     public boolean getDebugMode(){
         return debug;
     }
@@ -175,6 +184,9 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         initControlPoints(inputFrame);
         mGrayMat = new Mat(inputFrame.rows(), inputFrame.cols(), CvType.CV_8UC4);
         Imgproc.cvtColor(inputFrame, mGrayMat, Imgproc.COLOR_RGBA2GRAY);
+        if (light){
+            lightEnough();
+        }
         userAttention(inputFrame);
         mGrayMat.release();
         mCurrentMat=inputFrame;
@@ -284,8 +296,8 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
                     }
                 }
             }
-            Rect error = new Rect((int) (attention.x - inputFrame.cols() / 4), (int) (attention.y - inputFrame.rows() / 4),
-                    inputFrame.cols() / 2, inputFrame.rows() / 2);
+            //Rect error = new Rect((int) (attention.x - inputFrame.cols() / 4), (int) (attention.y - inputFrame.rows() / 4),
+            //        inputFrame.cols() / 2, inputFrame.rows() / 2);
             if (mOptions.size()>=10){
                 attention=oneNearest(average());
                 onEyeEvent(attention, error);
@@ -311,18 +323,23 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         double distanceLeft=distance(attension, down);
         double distanceCenter=distance(attension, center);
         if (distanceUp <= distanceDown && distanceUp<=distanceRight && distanceUp<=distanceLeft && distanceUp<=distanceCenter){
+            error=new Rect(new Point(0, 0), new Point(mGrayMat.cols(), mGrayMat.rows()/2));
             return up;
         }
         if (distanceDown <= distanceUp && distanceDown<=distanceRight && distanceDown<=distanceLeft && distanceDown<=distanceCenter){
+            error=new Rect(new Point(0, mGrayMat.rows()/2), new Point(mGrayMat.cols(), mGrayMat.rows()));
             return down;
         }
         if (distanceRight <= distanceUp && distanceRight<=distanceDown && distanceRight<=distanceLeft && distanceRight<=distanceCenter){
+            error=new Rect(new Point(mGrayMat.cols()/2, 0), new Point(mGrayMat.cols(), mGrayMat.rows()));
             return right;
         }
         if (distanceLeft <= distanceUp && distanceLeft<=distanceDown && distanceLeft<=distanceRight && distanceLeft<=distanceCenter){
+            error=new Rect(new Point(0, 0), new Point(mGrayMat.cols()/2, mGrayMat.rows()));
             return left;
         }
         if (distanceCenter <= distanceUp && distanceCenter<=distanceDown && distanceCenter<=distanceRight && distanceCenter<=distanceLeft){
+            error=new Rect(new Point(mGrayMat.cols()/2, mGrayMat.rows()/2), new Point(mGrayMat.cols()/2, mGrayMat.rows()/2));
             return center;
         }
         return null;
@@ -477,6 +494,20 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         return (right == 2 && left == 1) || (right == 1 && left == 2);
     }
 
+    //проверяет, достаточно ли светло для распознавания
+    //требует ресурсов, поэтому на слабых устройствах лучше не проверять
+    private void lightEnough(){
+        int color=0;
+        for(int i=0; i<30; i++){
+            for(int j=0; j<30; j++){
+                color+=mGrayMat.get(i, j)[0];
+            }
+        }
+        if(color/900>64){
+            callException(EXCEPTION_LITTLE_LIGHT);
+        }
+    }
+
     private void callException(@Exception int exception) {
         if (mExceptionListener != null) mExceptionListener.onCameraExceptionListener(exception);
     }
@@ -495,7 +526,8 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             EXCEPTION_MANY_FACES,
             EXCEPTION_STRANGE_ORIENTATION,
             EXCEPTION_NO_EYE,
-            EXCEPTION_MANY_EYES
+            EXCEPTION_MANY_EYES,
+            EXCEPTION_LITTLE_LIGHT
     })
     public @interface Exception {
         int EXCEPTION_NO_CAMERA = 0;
@@ -508,5 +540,6 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         int EXCEPTION_STRANGE_ORIENTATION = 7;
         int EXCEPTION_NO_EYE = 8;
         int EXCEPTION_MANY_EYES = 9;
+        int EXCEPTION_LITTLE_LIGHT=10;
     }
 }
