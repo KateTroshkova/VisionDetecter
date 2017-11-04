@@ -45,6 +45,7 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
  * родительский класс из open_cv CameraBridgeViewBase изменен!
  */
 public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.CvCameraViewListener {
+
     //классификатор, распознающий лицо и глаза
     private FaceClassifier mClassifier;
     //черно-белая матрица
@@ -54,21 +55,16 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     private OnCameraExceptionListener mExceptionListener = null;
     //интерфейс, через который активность получает точку, на которую смотрит пользователь
     private OnEyeDirectionListener mSightListener = null;
-
+    //листы для устранения "скачков" в распознавании
     private ArrayList<Point> mOptions;
-
-    private Point up, down, right, left, center;
-
+    private ArrayList<Point> mCenters;
     //если true будет происходить построение дополнительных линий
     private boolean debug = true;
-
+    //если true будет проверять освещенность комнаты
     private boolean light=false;
-
     private boolean mIsStarting = false;
-
+    //изображение, которое будет возвращено при уничтожении камеры
     private Mat mCurrentMat;
-
-    private Rect error;
 
     //количество дополнительных поворотов(пользовательские настройки)
     @Rotation
@@ -94,6 +90,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
      */
     public void startCamera() {
         mOptions=new ArrayList<>();
+        mCenters=new ArrayList<>();
         if (!hasCamera()) {
             callException(EXCEPTION_NO_CAMERA);
             return;
@@ -181,7 +178,6 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     @Override
     public Mat onCameraFrame(Mat inputFrame) {
         fixOrientation(inputFrame);
-        initControlPoints(inputFrame);
         mGrayMat = new Mat(inputFrame.rows(), inputFrame.cols(), CvType.CV_8UC4);
         Imgproc.cvtColor(inputFrame, mGrayMat, Imgproc.COLOR_RGBA2GRAY);
         if (light){
@@ -191,14 +187,6 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         mGrayMat.release();
         mCurrentMat=inputFrame;
         return inputFrame;
-    }
-
-    private void initControlPoints(Mat image){
-        up=new Point(image.cols()/2, 0);
-        down=new Point(image.cols()/2, image.rows());
-        right=new Point(image.cols(), image.rows()/2);
-        left=new Point(0, image.rows()/2);
-        center=new Point(image.cols()/2, image.rows()/2);
     }
 
     //отражение по горизонтали
@@ -271,108 +259,118 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
      * отрисовку нецелесообразно выносить в отдельный метод
      */
     private void userAttention(Mat inputFrame) {
-        Rect face = getFace();
+        Face face=getFace();
         if (face != null) {
-            Rect rightRegion = new Rect(face.x + face.width / 16, (int) (face.y + (face.height / 4.5)), (face.width - 2 * face.width / 16) / 2, (int) (face.height / 3.0));
-            Rect leftRegion = new Rect(face.x + face.width / 16 + (face.width - 2 * face.width / 16) / 2, (int) (face.y + (face.height / 4.5)), (face.width - 2 * face.width / 16) / 2, (int) (face.height / 3.0));
-            int right = getSight(inputFrame, rightRegion);
-            int left = getSight(inputFrame, leftRegion);
-
-            Point attention;
-            if (center(right, left)) {
-                attention = new Point(inputFrame.cols() / 2, inputFrame.rows() / 2);
-            } else {
-                if (right(right, left)) {
-                    attention = new Point(inputFrame.cols(), inputFrame.rows() / 2);
-                } else {
-                    if (left(right, left)) {
-                        attention = new Point(0, inputFrame.rows() / 2);
-                    } else {
-                        if (up(right, left)) {
-                            attention = new Point(inputFrame.cols() / 2, 0);
-                        } else {
-                            attention = new Point(inputFrame.cols() / 2, inputFrame.rows());
-                        }
-                    }
-                }
-            }
-            //Rect error = new Rect((int) (attention.x - inputFrame.cols() / 4), (int) (attention.y - inputFrame.rows() / 4),
-            //        inputFrame.cols() / 2, inputFrame.rows() / 2);
-            if (mOptions.size()>=10){
-                attention=oneNearest(average());
+            Eye right = detectEye(inputFrame, face.getRightEyeRegion());
+            Eye left = detectEye(inputFrame, face.getLeftEyeRegion());
+            Point attention=averagePupil(inputFrame, right, left);
+            Point zero=averageCenter(inputFrame, right, left);
+            Rect error;
+            error=quarter(inputFrame, zero, attention);
+            Imgproc.rectangle(inputFrame, error.tl(), error.br(), new Scalar(0, 0, 255, 255), 10);
+            Imgproc.circle(inputFrame, attention, 5, new Scalar(0, 0, 255, 255), 5);
+            Imgproc.circle(inputFrame, zero, 3, new Scalar(128, 128, 255, 255), 3);
+            if (mOptions.size()>=3){
+                attention=average(mOptions);
+                zero=average(mCenters);
+                error=quarter(inputFrame, zero, attention);
+                attention=new Point(error.tl().x+error.width/2, error.tl().y+error.height/2);
+                Eye result=new Eye(attention, null, error);
+                result.draw(inputFrame);
                 onEyeEvent(attention, error);
                 mOptions.clear();
-                Imgproc.circle(inputFrame, attention, 3, new Scalar(255, 255, 255, 255), 3);
-                Imgproc.rectangle(inputFrame, error.tl(), error.br(), new Scalar(255, 255, 255, 128));
+                mCenters.clear();
             }
             else{
                 mOptions.add(attention);
+                mCenters.add(zero);
             }
             if (debug) {
-                Imgproc.rectangle(inputFrame, face.tl(), face.br(), new Scalar(0, 255, 255, 255));
-                Imgproc.rectangle(inputFrame, rightRegion.tl(), rightRegion.br(), new Scalar(0, 255, 128, 255));
-                Imgproc.rectangle(inputFrame, leftRegion.tl(), leftRegion.br(), new Scalar(0, 255, 128, 255));
+                Eye intermediateValue=new Eye(attention, zero, null);
+                intermediateValue.draw(inputFrame);
+                face.draw(inputFrame);
             }
         }
     }
 
-    private Point oneNearest(Point attension){
-        double distanceUp=distance(attension, up);
-        double distanceDown=distance(attension, down);
-        double distanceRight=distance(attension, right);
-        double distanceLeft=distance(attension, down);
-        double distanceCenter=distance(attension, center);
-        if (distanceUp <= distanceDown && distanceUp<=distanceRight && distanceUp<=distanceLeft && distanceUp<=distanceCenter){
-            error=new Rect(new Point(0, 0), new Point(mGrayMat.cols(), mGrayMat.rows()/2));
-            return up;
+    //находит среднее значение между центрами правого и левого глаз
+    private Point averageCenter(Mat mat, Eye right, Eye left){
+        Point center=new Point(mat.cols()/2, mat.rows()/2);
+        if (right!=null && left!=null) {
+            ArrayList<Point> centers = new ArrayList<>();
+            centers.add(right.getCenter());
+            centers.add(left.getCenter());
+            center = average(centers);
         }
-        if (distanceDown <= distanceUp && distanceDown<=distanceRight && distanceDown<=distanceLeft && distanceDown<=distanceCenter){
-            error=new Rect(new Point(0, mGrayMat.rows()/2), new Point(mGrayMat.cols(), mGrayMat.rows()));
-            return down;
+        else{
+            if (right!=null){
+                center=right.getCenter();
+            }
+            else{
+                if (left!=null){
+                    center=left.getCenter();
+                }
+            }
         }
-        if (distanceRight <= distanceUp && distanceRight<=distanceDown && distanceRight<=distanceLeft && distanceRight<=distanceCenter){
-            error=new Rect(new Point(mGrayMat.cols()/2, 0), new Point(mGrayMat.cols(), mGrayMat.rows()));
-            return right;
-        }
-        if (distanceLeft <= distanceUp && distanceLeft<=distanceDown && distanceLeft<=distanceRight && distanceLeft<=distanceCenter){
-            error=new Rect(new Point(0, 0), new Point(mGrayMat.cols()/2, mGrayMat.rows()));
-            return left;
-        }
-        if (distanceCenter <= distanceUp && distanceCenter<=distanceDown && distanceCenter<=distanceRight && distanceCenter<=distanceLeft){
-            error=new Rect(new Point(mGrayMat.cols()/2, mGrayMat.rows()/2), new Point(mGrayMat.cols()/2, mGrayMat.rows()/2));
-            return center;
-        }
-        return null;
+        return center;
     }
 
-    private double distance(Point a, Point b){
-        return Math.sqrt((b.x-a.x)*(b.x-a.x)+(b.y-a.y)*(b.y-a.y));
+    //находит среднее значение между положением зрачков в правом и левом глазу
+    private Point averagePupil(Mat mat, Eye right, Eye left){
+        Point pupil=new Point(mat.cols()/2, mat.rows()/2);
+        if (right!=null && left!=null) {
+            ArrayList<Point> pupils = new ArrayList<>();
+            pupils.add(right.getPupil());
+            pupils.add(left.getPupil());
+            pupil = average(pupils);
+        }
+        else{
+            if (right!=null){
+                pupil=right.getCenter();
+            }
+            else{
+                if (left!=null){
+                    pupil=left.getCenter();
+                }
+            }
+        }
+        return pupil;
     }
 
-    private Point average(){
+    //среднее значение по массиву точек
+    private Point average(ArrayList<Point> points){
         float x=0;
         float y=0;
-        for(Point point:mOptions){
+        for(Point point:points){
             x+=point.x;
             y+=point.y;
         }
-        return new Point(x/mOptions.size(), y/mOptions.size());
+        return new Point(x/points.size(), y/points.size());
     }
 
-    //определяет четверть, в которой находится направление взгляда
-    private int quarter(Point center, Point pupil) {
-        int result = -1;
+    /**
+     * определяет область, на которую смотрит пользователь
+     * сравнивается полоожение зрачка и центра глаза
+     * центр глаза принимается за начало координат
+     * если зрачок правее и выше-первая четверть
+     * если зрачок левее и выше-вторая
+     * если зрачок левее и ниже-третья
+     * если зрачок правее и ниже-четвертая
+     * при любой ошибке возвращается экран цеиком
+     */
+    private Rect quarter(Mat mat, Point center, Point pupil) {
+        Rect result = new Rect(new Point(0, 0), new Point(mat.cols(), mat.rows()));
         if (pupil.x > center.x && pupil.y < center.y) {
-            result = 1;
+            result = new Rect(new Point(mat.cols()/2, 0), new Point(mat.cols(), mat.rows()/2));
         }
         if (pupil.x < center.x && pupil.y < center.y) {
-            result = 2;
+            result = new Rect(new Point(0, 0), new Point(mat.cols()/2, mat.rows()/2));
         }
         if (pupil.x < center.x && pupil.y > center.y) {
-            result = 3;
+            result = new Rect(new Point(0, mat.rows()/2), new Point(mat.cols()/2, mat.rows()));
         }
         if (pupil.x > center.x && pupil.y > center.y) {
-            result = 4;
+            result = new Rect(new Point(mat.cols()/2, mat.rows()/2), new Point(mat.cols(), mat.rows()));
         }
         return result;
     }
@@ -384,10 +382,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
      * слишком близкое или слишком далекое расположение лица(оптимально-20%)
      * освещение, поворот
      */
-    private Rect getFace() {
+    private Face getFace() {
         Rect[] faces = mClassifier.getFaces(mGrayMat, (int) (mGrayMat.rows() * 0.2));
         if (faces.length == 1) {
-            return faces[0];
+            return new Face(faces[0]);
         } else {
             if (faces.length < 1) callException(EXCEPTION_NO_FACE);
             else if (faces.length > 1) callException(EXCEPTION_MANY_FACES);
@@ -396,48 +394,26 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     }
 
     /**
-     * возвращает четверть, на которую смотрит пользователь
-     * находит область глаза, ее центр и зрачок
-     * центр области берется за начало координат
-     * вычисляется четверть, в которой зрачок находится относительно глаза
-     * возможно null исключение, если глаз не будет найден
-     * из-за большого количества локальных переменных
-     * нецелесообразно выносить рисование в отдельный метод
+     * находит область глаза (область, где движется зрачок)
+     * на основе этой области создается глаз с рассчитаными зрачком и центром глаза
+     * слишком маленькие области отсеиваются - это заведомо ошибка распознавания
      */
-    private int getSight(Mat mat, Rect eyeRegion) {
+    private Eye detectEye(Mat mat, Rect eyeRegion){
         try {
-            Rect eye = getEyeRegion(eyeRegion);
-            Point center = getCentralPoint(eye);
-            Point pupil = getPupil(eye);
-            int quarter = quarter(center, pupil);
-            if (debug && eye != null) {
-                Imgproc.rectangle(mat, eye.tl(), eye.br(), new Scalar(0, 255, 0, 255));
-                Imgproc.circle(mat, center, 2, new Scalar(255, 0, 0, 255), 2);
-                Imgproc.circle(mat, pupil, 2, new Scalar(255, 255, 255, 255), 2);
+            Rect region=getEyeRegion(eyeRegion);
+            if (tooSmall(region, eyeRegion)){
+                return null;
             }
-            return quarter;
-        } catch (NullPointerException e) {
+            Eye result=new Eye(mGrayMat, region);
+            if (debug) {
+                result.draw(mat);
+            }
+            return result;
+        }
+        catch(NullPointerException e){
             e.printStackTrace();
         }
-        return -1;
-    }
-
-    //находит центр области глаза
-    //c=(x+x1)/2; (y+y1)/2
-    private Point getCentralPoint(Rect eye) {
-        double centerX = eye.tl().x + eye.width / 2;
-        double centerY = eye.tl().y + eye.height / 2;
-        return new Point(centerX, centerY);
-    }
-
-    /**
-     * находит зрачок
-     * зрачок-самая темная точка на изображении глаза
-     * возвращает точку с координатами, пересчитанными в абсолютные
-     */
-    private Point getPupil(Rect eye) {
-        Core.MinMaxLocResult pupil = Core.minMaxLoc(mGrayMat.submat(eye));
-        return new Point(pupil.minLoc.x + eye.x, pupil.minLoc.y + eye.y);
+        return null;
     }
 
     /**
@@ -454,7 +430,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         if (eyes.length == 1) {
             Rect eye = eyes[0];
             eye.x = eyeRegion.x + eye.x;
-            eye.y = eyeRegion.y + eye.y;
+            eye.y = eyeRegion.y + eye.y-eye.height/4;
             return new Rect((int) eye.tl().x, (int) (eye.tl().y + eye.height * 0.4), eye.width, (int) (eye.height * 0.6));
         } else {
             if (eyes.length < 1) callException(EXCEPTION_NO_EYE);
@@ -478,24 +454,15 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         return OpenCVLoader.initDebug();
     }
 
-    private boolean center(int right, int left) {
-        return right == -1 && left == -1;
+    //глаз должен занимать как минимум 1/16 от области, в которой его ищут
+    private boolean tooSmall(Rect eye, Rect eyeRegion){
+        return eye.area()<eyeRegion.area()/16;
     }
 
-    private boolean right(int right, int left) {
-        return (right == 1 && left == 1) || (right == 1 && left == -1) || (right == -1 && left == 1);
-    }
-
-    private boolean left(int right, int left) {
-        return right == 2 && left == 2 || (right == 2 && left == -1) || (right == -1 && left == 2);
-    }
-
-    private boolean up(int right, int left) {
-        return (right == 2 && left == 1) || (right == 1 && left == 2);
-    }
-
-    //проверяет, достаточно ли светло для распознавания
-    //требует ресурсов, поэтому на слабых устройствах лучше не проверять
+    /**
+     * проверяет, достаточно ли светло для распознавания
+     * требует ресурсов, поэтому на слабых устройствах лучше не проверять
+     */
     private void lightEnough(){
         int color=0;
         for(int i=0; i<30; i++){
