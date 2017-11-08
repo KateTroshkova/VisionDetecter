@@ -58,15 +58,15 @@ public class Eye {
         pupil = new Point(darkestPoint.minLoc.x + region.x, darkestPoint.minLoc.y + region.y);
     }
 
-    public void draw(Mat mat){
+    public void draw(Mat mat, Scalar regionScalar, Scalar centerScalar, Scalar pupilScalar){
         if (region!=null) {
-            Imgproc.rectangle(mat, region.tl(), region.br(), new Scalar(0, 255, 0, 255));
+            Imgproc.rectangle(mat, region.tl(), region.br(), regionScalar);
         }
         if (center!=null) {
-            Imgproc.circle(mat, center, 2, new Scalar(255, 0, 0, 255), 2);
+            Imgproc.circle(mat, center, 2, centerScalar, 2);
         }
         if (pupil!=null) {
-            Imgproc.circle(mat, pupil, 2, new Scalar(255, 255, 255, 255), 2);
+            Imgproc.circle(mat, pupil, 2, pupilScalar, 2);
         }
     }
 }

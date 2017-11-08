@@ -265,18 +265,14 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             Eye left = detectEye(inputFrame, face.getLeftEyeRegion());
             Point attention=averagePupil(inputFrame, right, left);
             Point zero=averageCenter(inputFrame, right, left);
-            Rect error;
-            error=quarter(inputFrame, zero, attention);
-            Imgproc.rectangle(inputFrame, error.tl(), error.br(), new Scalar(0, 0, 255, 255), 10);
-            Imgproc.circle(inputFrame, attention, 5, new Scalar(0, 0, 255, 255), 5);
-            Imgproc.circle(inputFrame, zero, 3, new Scalar(128, 128, 255, 255), 3);
+            Rect error=quarter(inputFrame, zero, attention);
+            Eye result = null;
             if (mOptions.size()>=3){
                 attention=average(mOptions);
                 zero=average(mCenters);
                 error=quarter(inputFrame, zero, attention);
                 attention=new Point(error.tl().x+error.width/2, error.tl().y+error.height/2);
-                Eye result=new Eye(attention, null, error);
-                result.draw(inputFrame);
+                result=new Eye(attention, null, error);
                 onEyeEvent(attention, error);
                 mOptions.clear();
                 mCenters.clear();
@@ -286,8 +282,17 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
                 mCenters.add(zero);
             }
             if (debug) {
-                Eye intermediateValue=new Eye(attention, zero, null);
-                intermediateValue.draw(inputFrame);
+                if (right!=null) {
+                    right.draw(inputFrame, new Scalar(0, 255, 0, 255), new Scalar(255, 0, 0, 255), new Scalar(255, 255, 255, 255));
+                }
+                if (left!=null) {
+                    left.draw(inputFrame, new Scalar(0, 255, 0, 255), new Scalar(255, 0, 0, 255), new Scalar(255, 255, 255, 255));
+                }
+                if (result!=null){
+                    result.draw(inputFrame, new Scalar(0, 255, 0, 255), new Scalar(255, 0, 0, 255), new Scalar(255, 255, 255, 255));
+                }
+                Eye intermediateValue=new Eye(attention, zero, error);
+                intermediateValue.draw(inputFrame, new Scalar(0, 0, 255, 255), new Scalar(0, 0, 255, 255), new Scalar(128, 128, 255, 255));
                 face.draw(inputFrame);
             }
         }
@@ -404,11 +409,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             if (tooSmall(region, eyeRegion)){
                 return null;
             }
-            Eye result=new Eye(mGrayMat, region);
-            if (debug) {
-                result.draw(mat);
-            }
-            return result;
+            return new Eye(mGrayMat, region);
         }
         catch(NullPointerException e){
             e.printStackTrace();
