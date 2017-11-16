@@ -60,7 +60,7 @@ public class Eye {
 
     public void draw(Mat mat, Scalar regionScalar, Scalar centerScalar, Scalar pupilScalar){
         if (region!=null) {
-            Imgproc.rectangle(mat, region.tl(), region.br(), regionScalar);
+            Imgproc.rectangle(mat, region.tl(), region.br(), regionScalar, 10);
         }
         if (center!=null) {
             Imgproc.circle(mat, center, 2, centerScalar, 2);

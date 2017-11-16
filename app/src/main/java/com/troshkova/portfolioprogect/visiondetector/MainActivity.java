@@ -1,13 +1,17 @@
 package com.troshkova.portfolioprogect.visiondetector;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
@@ -30,14 +34,35 @@ public class MainActivity extends AppCompatActivity implements SmartCamera.OnCam
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        camera=(SmartCamera)findViewById(R.id.camera);
-        camera.setDebugMode(true);
-        camera.setOnCameraExceptionListener(this);
-        camera.setOnDetectSightListener(this);
-        camera.startCamera();
+        ActivityCompat.requestPermissions(MainActivity.this,
+                new String[]{Manifest.permission.CAMERA},
+                1);
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 1: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    camera=(SmartCamera)findViewById(R.id.camera);
+                    camera.setDebugMode(true);
+                    camera.setOnCameraExceptionListener(this);
+                    camera.setOnDetectSightListener(this);
+                    camera.startCamera();
+                } else {
+                }
+                return;
+            }
+        }
+    }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (camera!=null) {
+            camera.pause();
+        }
+    }
 
     @Override
     public void onDetectSight(Point sight, Rect region) {
