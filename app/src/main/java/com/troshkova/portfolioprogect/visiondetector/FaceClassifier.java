@@ -26,6 +26,9 @@ public class FaceClassifier {
     private static String eyePath;
     private static String path;
 
+    private CascadeClassifier mFaceClassifier;
+    private CascadeClassifier mEyeClassifier;
+
     public FaceClassifier(Context context, SmartCamera.OnCameraExceptionListener listener, OnClassifierPrepareListener prepareListener){
         this.context=context;
         this.listener=listener;
@@ -39,11 +42,11 @@ public class FaceClassifier {
             public void run() {
                 String path=rewriteDataSource(R.raw.lbpcascade_frontalface, "cascade", "frontalface.xml");
                 if (path!=null){
-                    FaceClassifier.path=path;
+                    mFaceClassifier=new CascadeClassifier(path);
                 }
                 String eyePath=rewriteDataSource(R.raw.haarcascade_eye, "cascadeER", "eye.xml");
                 if (eyePath!=null) {
-                    FaceClassifier.eyePath=eyePath;
+                    mEyeClassifier=new CascadeClassifier(eyePath);
                 }
                 prepareListener.onClassifierPrepare();
             }
@@ -56,17 +59,17 @@ public class FaceClassifier {
 
     //распознавание лиц
     public synchronized Rect[] getFaces(Mat grayScaleImage, int faceSize){
-        CascadeClassifier faceClassifier = new CascadeClassifier(path);
+        //CascadeClassifier faceClassifier = new CascadeClassifier(path);
         MatOfRect faces = new MatOfRect();
-        faceClassifier.detectMultiScale(grayScaleImage, faces, 1.1, 2, 2, new Size(faceSize, faceSize), new Size());
+        mFaceClassifier.detectMultiScale(grayScaleImage, faces, 1.1, 2, 2, new Size(faceSize, faceSize), new Size());
         return faces.toArray();
     }
 
     //распознавание глаз
     public synchronized Rect[] getEyes(Mat grayScaleImage, Rect eyeArea){
-        CascadeClassifier eyeClassifier = new CascadeClassifier(eyePath);
+       // CascadeClassifier eyeClassifier = new CascadeClassifier(eyePath);
         MatOfRect eyes=new MatOfRect();
-        eyeClassifier.detectMultiScale(grayScaleImage.submat(eyeArea), eyes, 1.15, 2, Objdetect.CASCADE_FIND_BIGGEST_OBJECT
+        mEyeClassifier.detectMultiScale(grayScaleImage.submat(eyeArea), eyes, 1.15, 2, Objdetect.CASCADE_FIND_BIGGEST_OBJECT
                         | Objdetect.CASCADE_SCALE_IMAGE, new Size(30, 30), new Size());
         return eyes.toArray();
     }

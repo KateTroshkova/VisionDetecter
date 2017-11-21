@@ -178,10 +178,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
 
     //остановка всех запущенных потоков и очистка данных о направлении взгляда
     //должен вызываться при смене ориентации
-    public void pause(){
-        for(Thread thread:mThreads){
-            thread.interrupt();
-        }
+     void pause(){
+    //    for(Thread thread:mThreads){
+    //        thread.interrupt();
+    //    }
         mOptions.clear();
         mThreads.clear();
     }
@@ -493,7 +493,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             Rect eye = eyes[0];
             eye.x = eyeRegion.x + eye.x;
             eye.y = eyeRegion.y + eye.y-eye.height/4;
-            return new Rect((int) (eye.tl().x+eye.height*0.15), (int) (eye.tl().y + eye.height * 0.4), (int)(eye.width*0.85), (int) (eye.height * 0.6));
+            return new Rect((int) (eye.tl().x+eye.height*0.15), (int) (eye.tl().y + eye.height * 0.55), (int)(eye.width*0.85), (int) (eye.height * 0.5));
         } else {
             if (eyes.length < 1) callException(EXCEPTION_NO_EYE);
             else if (eyes.length > 1) callException(EXCEPTION_MANY_EYES);
