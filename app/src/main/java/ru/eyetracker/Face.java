@@ -1,4 +1,4 @@
-package com.troshkova.portfolioprogect.visiondetector;
+package ru.eyetracker;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Rect;
@@ -31,8 +31,16 @@ public class Face {
         return rightEyeRegion;
     }
 
+    public void setRightEyeRegion(Rect rightEyeRegion){
+        this.rightEyeRegion=rightEyeRegion;
+    }
+
     public Rect getLeftEyeRegion(){
         return leftEyeRegion;
+    }
+
+    public void setLeftEyeRegion(Rect leftEyeRegion){
+        this.leftEyeRegion=leftEyeRegion;
     }
 
     public void draw(Mat mat){

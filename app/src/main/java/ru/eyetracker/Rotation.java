@@ -1,4 +1,4 @@
-package com.troshkova.portfolioprogect.visiondetector;
+package ru.eyetracker;
 
 import android.support.annotation.IntDef;
 

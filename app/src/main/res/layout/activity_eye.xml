@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageButton
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp"
+        android:layout_marginTop="12dp"
+        android:background="?attr/selectableItemBackground"
+        android:contentDescription="@string/voice"
+        android:onClick="onBack"
+        android:scaleType="centerCrop"
+        app:srcCompat="@drawable/ic_arrow_back"/>
+
+    <com.troshkova.portfolioprogect.visiondetector.SmartCamera
+        android:id="@+id/camera"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        app:camera_id="front"/>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:contentDescription="@string/eat"
+            android:id="@+id/image_left"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center_vertical"
+            android:background="@drawable/round"
+            android:padding="8dp"
+            app:srcCompat="@drawable/ic_dining"/>
+
+        <ImageView
+            android:contentDescription="@string/yes"
+            android:id="@+id/image_up"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center_horizontal"
+            android:background="@drawable/round"
+            android:padding="8dp"
+            app:srcCompat="@drawable/ic_thumb_up"/>
+
+        <ImageView
+            android:contentDescription="@string/no"
+            android:id="@+id/image_down"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="@drawable/round"
+            android:padding="8dp"
+            app:srcCompat="@drawable/ic_thumb_down"/>
+
+        <ImageView
+            android:id="@+id/image_right"
+            android:contentDescription="@string/drink"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center_vertical|end"
+            android:background="@drawable/round"
+            android:padding="8dp"
+            app:srcCompat="@drawable/ic_drink"/>
+    </FrameLayout>
+</FrameLayout>

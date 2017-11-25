@@ -1,6 +1,8 @@
-package com.troshkova.portfolioprogect.visiondetector;
+package ru.eyetracker;
 
 import android.content.Context;
+
+import com.troshkova.portfolioprogect.visiondetector.R;
 
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
@@ -15,16 +17,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-//класс для распознавания лица и глаз
-//используется встроенный в open_cv классификатор
 public class FaceClassifier {
 
     private Context context;
     private SmartCamera.OnCameraExceptionListener listener;
     private OnClassifierPrepareListener prepareListener;
-
-    private static String eyePath;
-    private static String path;
 
     private CascadeClassifier mFaceClassifier;
     private CascadeClassifier mEyeClassifier;
@@ -35,7 +32,6 @@ public class FaceClassifier {
         this.prepareListener=prepareListener;
     }
 
-    //асинхронная перезапись ресурсов в память устройства
     public void prepare(){
         new Thread(new Runnable() {
             @Override
@@ -57,24 +53,19 @@ public class FaceClassifier {
         void onClassifierPrepare();
     }
 
-    //распознавание лиц
     public synchronized Rect[] getFaces(Mat grayScaleImage, int faceSize){
-        //CascadeClassifier faceClassifier = new CascadeClassifier(path);
         MatOfRect faces = new MatOfRect();
         mFaceClassifier.detectMultiScale(grayScaleImage, faces, 1.1, 2, 2, new Size(faceSize, faceSize), new Size());
         return faces.toArray();
     }
 
-    //распознавание глаз
     public synchronized Rect[] getEyes(Mat grayScaleImage, Rect eyeArea){
-       // CascadeClassifier eyeClassifier = new CascadeClassifier(eyePath);
         MatOfRect eyes=new MatOfRect();
         mEyeClassifier.detectMultiScale(grayScaleImage.submat(eyeArea), eyes, 1.15, 2, Objdetect.CASCADE_FIND_BIGGEST_OBJECT
                         | Objdetect.CASCADE_SCALE_IMAGE, new Size(30, 30), new Size());
         return eyes.toArray();
     }
 
-    //перезапись файла из ресурсов в отдельный файл, откуда классификатор может считать данные
     private String rewriteDataSource(int id, String direction, String name){
         try {
             InputStream input = context.getResources().openRawResource(id);

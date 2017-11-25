@@ -1,19 +1,15 @@
-package com.troshkova.portfolioprogect.visiondetector;
+package ru.eyetracker;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.hardware.Camera;
 import android.support.annotation.IntDef;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.View;
 import android.view.WindowManager;
 
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -24,55 +20,41 @@ import org.opencv.imgproc.Imgproc;
 
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Stack;
 
 import static android.view.Surface.ROTATION_0;
 import static android.view.Surface.ROTATION_180;
 import static android.view.Surface.ROTATION_270;
 import static android.view.Surface.ROTATION_90;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_LIB_NOT_READY;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_LITTLE_LIGHT;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_MANY_EYES;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_MANY_FACES;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_NO_CAMERA;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_NO_EYE;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_NO_FACE;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_NO_FRONT_CAMERA;
-import static com.troshkova.portfolioprogect.visiondetector.SmartCamera.Exception.EXCEPTION_STRANGE_ORIENTATION;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_LIB_NOT_READY;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_LITTLE_LIGHT;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_MANY_EYES;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_MANY_FACES;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_NO_CAMERA;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_NO_EYE;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_NO_FACE;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_NO_FRONT_CAMERA;
+import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_STRANGE_ORIENTATION;
 
-/**
- * Камера, обрабатывающая изображение. находит глаза и вычисляет направление взгляда
- */
 public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.CvCameraViewListener, FaceClassifier.OnClassifierPrepareListener {
 
-    //классификатор, распознающий лицо и глаза
     private FaceClassifier mClassifier;
-    //интерфейс, который должна расширить активность, чтобы обрабатывать возникающие в процессе работы исключения
     private OnCameraExceptionListener mExceptionListener = null;
-    //интерфейс, через который активность получает точку, на которую смотрит пользователь
     private OnEyeDirectionListener mSightListener = null;
-    //список возможных точек, на которые смотрит пользователь
     private ArrayList<Eye> mOptions;
-    //если true будет происходить построение дополнительных линий
     private boolean debug = true;
-    //если true будет проверять освещенность комнаты
-    private boolean light=false;
     private boolean mIsStarting = false;
-    //изображение, которое будет возвращено при уничтожении камеры
-    private Mat mCurrentMat;
-    //список запущенных потоков
     private ArrayList<Thread> mThreads;
-    //количество дополнительных поворотов(пользовательские настройки)
     @Rotation
     private int mRotate = ROTATION_0;
-    //дополнительное отражение(пользовательские настройки)
     private boolean mMirror = false;
-    //флаг готовности классификатора
     private boolean isReady=false;
+
+    private Direction direction=Direction.DIRECTION_CENTER;
+
+    public SmartCamera(Context context, AttributeSet attrs) {
+        super(context, attrs);
+    }
 
     @Override
     public void onClassifierPrepare() {
@@ -84,11 +66,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     }
 
     public interface OnEyeDirectionListener {
-        void onDetectSight(Point sight, Rect region);
-    }
-
-    public SmartCamera(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        void onDetectSight(Direction direction);
     }
 
     /**
@@ -117,35 +95,6 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         mClassifier.prepare();
     }
 
-    /**
-     * остановка камеры:
-     * очистка всех ресурсов
-     * запоминает последний кадр и отдает в место вызова
-     */
-    public Bitmap stopCamera() {
-        if (!mIsStarting) return null;
-        mIsStarting = false;
-        setCvCameraViewListener((CvCameraViewListener) null);
-        //mGrayMat.release();
-        disableFpsMeter();
-        disableView();
-        disconnectCamera();
-        releaseCamera();
-        Bitmap lastFrame = Bitmap.createBitmap(mCurrentMat.cols(), mCurrentMat.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(mCurrentMat, lastFrame);
-        return lastFrame;
-    }
-
-    //слушатель для точки-результата
-    public void setOnDetectSightListener(OnEyeDirectionListener listener) {
-        mSightListener = listener;
-    }
-
-    //слушатель для исключений
-    public void setOnCameraExceptionListener(OnCameraExceptionListener listener) {
-        mExceptionListener = listener;
-    }
-
     //внешний интерфейс
     //нужно ли отрисовывать
     public void setDebugMode(boolean isDebugEnable) {
@@ -159,11 +108,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     public void setMirror(boolean isMirror) {
         mMirror = isMirror;
     }
-    //проверка освещенности
-    public void checkLight(boolean light){
-        this.light=light;
-    }
-    //отрисовка
+
     public boolean getDebugMode(){
         return debug;
     }
@@ -176,12 +121,19 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         return mMirror;
     }
 
+    //слушатель для точки-результата
+    public void setOnDetectSightListener(OnEyeDirectionListener listener) {
+        mSightListener = listener;
+    }
+
+    //слушатель для исключений
+    public void setOnCameraExceptionListener(OnCameraExceptionListener listener) {
+        mExceptionListener = listener;
+    }
+
     //остановка всех запущенных потоков и очистка данных о направлении взгляда
     //должен вызываться при смене ориентации
      void pause(){
-    //    for(Thread thread:mThreads){
-    //        thread.interrupt();
-    //    }
         mOptions.clear();
         mThreads.clear();
     }
@@ -216,13 +168,12 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     @Override
     public Mat onCameraFrame(final Mat inputFrame) {
         fixOrientation(inputFrame);
-        mCurrentMat = inputFrame;
         if (isReady) {
             Thread thread=new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        processImage(mCurrentMat);
+                        processImage(inputFrame);
                     }
                     catch (java.lang.Exception e){
                         e.printStackTrace();
@@ -233,9 +184,9 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             mThreads.add(thread);
         }
         if (mOptions.size()>4) {
-            calculateResult();
+            calculateResult(inputFrame);
         }
-        return mCurrentMat;
+        return inputFrame;
     }
 
     //отражение по горизонтали
@@ -303,7 +254,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     }
 
     /**
-     *обработка кадра
+     * обработка кадра
      * создается черно-белая матрица
      * вычисляется точка, на которую смотрит пользователь
      */
@@ -400,15 +351,19 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     private Rect quarter(Mat mat, Point center, Point pupil) {
         Rect result = new Rect(new Point(0, 0), new Point(mat.cols(), mat.rows()));
         if (pupil.x > center.x && pupil.y < center.y) {
+            direction=Direction.DIRECTION_1;
             result = new Rect(new Point(mat.cols()/2, 0), new Point(mat.cols(), mat.rows()/2));
         }
         if (pupil.x < center.x && pupil.y < center.y) {
+            direction=Direction.DIRECTION_2;
             result = new Rect(new Point(0, 0), new Point(mat.cols()/2, mat.rows()/2));
         }
         if (pupil.x < center.x && pupil.y > center.y) {
+            direction=Direction.DIRECTION_3;
             result = new Rect(new Point(0, mat.rows()/2), new Point(mat.cols()/2, mat.rows()));
         }
         if (pupil.x > center.x && pupil.y > center.y) {
+            direction=Direction.DIRECTION_4;
             result = new Rect(new Point(mat.cols()/2, mat.rows()/2), new Point(mat.cols(), mat.rows()));
         }
         return result;
@@ -421,7 +376,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
      * точка, на которую смотрит пользователь-середина четверти
      * отправляет и отрисовывает результат
      */
-    private void calculateResult(){
+    private void calculateResult(Mat mat){
         ArrayList<Point> pupils=new ArrayList<>();
         ArrayList<Point> centers=new ArrayList<>();
         for (Eye eye : mOptions) {
@@ -431,13 +386,13 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         mOptions.clear();
         Point attention = average(pupils);
         Point zero = average(centers);
-        Rect error = quarter(mCurrentMat, zero, attention);
+        Rect error = quarter(mat, zero, attention);
         attention = new Point(error.tl().x + error.width / 2, error.tl().y + error.height / 2);
         Eye result = new Eye(attention, null, error);
-        onEyeEvent(attention, error);
+        onEyeEvent(direction);
         mOptions.clear();
         if (debug) {
-            result.draw(mCurrentMat, new Scalar(255, 0, 0, 255), null, new Scalar(255, 255, 255, 255));
+            result.draw(mat, new Scalar(255, 0, 0, 255), null, new Scalar(255, 255, 255, 255));
         }
     }
 
@@ -521,27 +476,11 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
         return eye.area()<eyeRegion.area()/16;
     }
 
-    /**
-     * проверяет, достаточно ли светло для распознавания
-     * требует ресурсов, поэтому на слабых устройствах лучше не проверять
-     */
-    private void lightEnough(Mat mGrayMat){
-        int color=0;
-        for(int i=0; i<30; i++){
-            for(int j=0; j<30; j++){
-                color+=mGrayMat.get(i, j)[0];
-            }
-        }
-        if(color/900>64){
-            callException(EXCEPTION_LITTLE_LIGHT);
-        }
-    }
-
     private void callException(@Exception int exception) {
         if (mExceptionListener != null) mExceptionListener.onCameraExceptionListener(exception);
     }
-    private void onEyeEvent(Point sight, Rect rect){
-        if(mSightListener!=null) mSightListener.onDetectSight(sight,rect);
+    private void onEyeEvent(Direction direction){
+        if(mSightListener!=null) mSightListener.onDetectSight(direction);
     }
 
     @Retention(SOURCE)

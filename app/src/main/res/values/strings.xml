@@ -1,6 +1,15 @@
 <resources>
     <string name="app_name">VisionDetector</string>
-    <string name="preferences">com.troshkova.portfolioprogect.visiondetecter</string>
-    <string name="mirror_preference">com.troshkova.portfolioprogect.visiondetecter.mirror</string>
-    <string name="rotate_preference">com.troshkova.portfolioprogect.visiondetecter.rotate</string>
+    <string name="preferences" translatable="false">com.troshkova.portfolioprogect.visiondetecter</string>
+    <string name="mirror_preference" translatable="false">com.troshkova.portfolioprogect.visiondetecter.mirror</string>
+    <string name="rotate_preference" translatable="false">com.troshkova.portfolioprogect.visiondetecter.rotate</string>
+    <string name="eye_remote">Управление\nвзглядом</string>
+    <string name="speak_keyboard">Говорящая\nклавиатура</string>
+    <string name="info">Информация</string>
+    <string name="keyboard_info">Введите текст, который необходимо озвучить</string>
+    <string name="voice">Озвучить</string>
+    <string name="drink">Я хочу пить</string>
+    <string name="no">Нет</string>
+    <string name="yes">Да</string>
+    <string name="eat">Я хочу покушать</string>
 </resources>

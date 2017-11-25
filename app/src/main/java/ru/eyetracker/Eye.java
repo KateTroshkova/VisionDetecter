@@ -1,4 +1,4 @@
-package com.troshkova.portfolioprogect.visiondetector;
+package ru.eyetracker;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
