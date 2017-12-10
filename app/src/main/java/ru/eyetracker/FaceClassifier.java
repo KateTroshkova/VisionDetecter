@@ -2,8 +2,6 @@ package ru.eyetracker;
 
 import android.content.Context;
 
-import com.troshkova.portfolioprogect.visiondetector.R;
-
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Rect;

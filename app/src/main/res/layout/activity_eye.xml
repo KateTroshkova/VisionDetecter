@@ -6,8 +6,8 @@
     android:layout_height="match_parent">
 
     <ImageButton
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginLeft="8dp"
         android:layout_marginRight="8dp"
         android:layout_marginTop="12dp"
@@ -17,7 +17,7 @@
         android:scaleType="centerCrop"
         app:srcCompat="@drawable/ic_arrow_back"/>
 
-    <com.troshkova.portfolioprogect.visiondetector.SmartCamera
+    <ru.eyetracker.SmartCamera
         android:id="@+id/camera"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

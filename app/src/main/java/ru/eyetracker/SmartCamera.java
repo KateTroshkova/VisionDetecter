@@ -2,7 +2,10 @@ package ru.eyetracker;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.Camera;
+import android.provider.MediaStore;
 import android.support.annotation.IntDef;
 import android.util.AttributeSet;
 import android.view.WindowManager;
@@ -10,6 +13,7 @@ import android.view.WindowManager;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -36,12 +40,14 @@ import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_NO_FACE;
 import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_NO_FRONT_CAMERA;
 import static ru.eyetracker.SmartCamera.Exception.EXCEPTION_STRANGE_ORIENTATION;
 
-public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.CvCameraViewListener, FaceClassifier.OnClassifierPrepareListener {
+public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.CvCameraViewListener,
+        FaceClassifier.OnClassifierPrepareListener{
 
     private FaceClassifier mClassifier;
     private OnCameraExceptionListener mExceptionListener = null;
     private OnEyeDirectionListener mSightListener = null;
     private ArrayList<Eye> mOptions;
+    private Mat currentMat;
     private boolean debug = true;
     private boolean mIsStarting = false;
     private ArrayList<Thread> mThreads;
@@ -49,6 +55,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     private int mRotate = ROTATION_0;
     private boolean mMirror = false;
     private boolean isReady=false;
+    private boolean photo=false;
 
     private Direction direction=Direction.DIRECTION_CENTER;
 
@@ -134,8 +141,10 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     //остановка всех запущенных потоков и очистка данных о направлении взгляда
     //должен вызываться при смене ориентации
      void pause(){
-        mOptions.clear();
-        mThreads.clear();
+        if (mOptions!=null && mThreads!=null) {
+            mOptions.clear();
+            mThreads.clear();
+        }
     }
 
     //вызывается при смене ориентации
@@ -168,25 +177,18 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     @Override
     public Mat onCameraFrame(final Mat inputFrame) {
         fixOrientation(inputFrame);
-        if (isReady) {
-            Thread thread=new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        processImage(inputFrame);
-                    }
-                    catch (java.lang.Exception e){
-                        e.printStackTrace();
-                    }
-                }
-            });
-            thread.start();
-            mThreads.add(thread);
-        }
-        if (mOptions.size()>4) {
-            calculateResult(inputFrame);
+        if (photo){
+            processImage(inputFrame);
+            photo=false;
+            //TODO: do whatever you want with bitmap
+            Bitmap result = Bitmap.createBitmap(inputFrame.cols(), inputFrame.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(inputFrame, result);
         }
         return inputFrame;
+    }
+
+    public void takePicture(){
+        photo=true;
     }
 
     //отражение по горизонтали
@@ -261,6 +263,7 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
     private void processImage(Mat mat){
         Mat mGrayMat = new Mat(mat.rows(), mat.cols(), CvType.CV_8UC4);
         Imgproc.cvtColor(mat, mGrayMat, Imgproc.COLOR_RGBA2GRAY);
+        currentMat=mGrayMat;
         userAttention(mat, mGrayMat);
         mGrayMat.release();
     }
@@ -279,7 +282,19 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             Point attention=averagePupil(inputFrame, right, left);
             Point zero=averageCenter(inputFrame, right, left);
             Rect error=quarter(inputFrame, zero, attention);
-            mOptions.add(new Eye(attention, zero, error));
+            attention = new Point(error.tl().x + error.width / 2, error.tl().y + error.height / 2);
+            Eye result = new Eye(attention, null, error);
+            onEyeEvent(direction);
+            if (debug){
+                face.draw(inputFrame);
+                if (right!=null){
+                    right.draw(inputFrame, new Scalar(255, 0, 0, 255), new Scalar(0, 255, 0, 255), new Scalar(0, 0, 255, 255));
+                }
+                if (left!=null){
+                    left.draw(inputFrame, new Scalar(255, 0, 0, 255), new Scalar(0, 255, 0, 255), new Scalar(0, 0, 255, 255));
+                }
+                result.draw(inputFrame, new Scalar(255, 0, 0, 255), null, new Scalar(255, 255, 255, 255));
+            }
         }
     }
 
@@ -367,33 +382,6 @@ public class SmartCamera extends JavaCameraView implements CameraBridgeViewBase.
             result = new Rect(new Point(mat.cols()/2, mat.rows()/2), new Point(mat.cols(), mat.rows()));
         }
         return result;
-    }
-
-    /**
-     * разделяет список возможных направлений взгяда на списки зрачков и центров
-     * усредняет значения
-     * вычисяет четверть, в которой находится усредненный результат
-     * точка, на которую смотрит пользователь-середина четверти
-     * отправляет и отрисовывает результат
-     */
-    private void calculateResult(Mat mat){
-        ArrayList<Point> pupils=new ArrayList<>();
-        ArrayList<Point> centers=new ArrayList<>();
-        for (Eye eye : mOptions) {
-            pupils.add(eye.getPupil());
-            centers.add(eye.getCenter());
-        }
-        mOptions.clear();
-        Point attention = average(pupils);
-        Point zero = average(centers);
-        Rect error = quarter(mat, zero, attention);
-        attention = new Point(error.tl().x + error.width / 2, error.tl().y + error.height / 2);
-        Eye result = new Eye(attention, null, error);
-        onEyeEvent(direction);
-        mOptions.clear();
-        if (debug) {
-            result.draw(mat, new Scalar(255, 0, 0, 255), null, new Scalar(255, 255, 255, 255));
-        }
     }
 
     /**

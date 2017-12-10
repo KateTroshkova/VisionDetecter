@@ -10,11 +10,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.ImageView;
 
-import com.troshkova.portfolioprogect.visiondetector.R;
-
-import org.opencv.core.Point;
-import org.opencv.core.Rect;
-
 public class EyeActivity extends AppCompatActivity implements SmartCamera.OnCameraExceptionListener, SmartCamera.OnEyeDirectionListener {
 
     private SmartCamera mCamera;
@@ -37,7 +32,6 @@ public class EyeActivity extends AppCompatActivity implements SmartCamera.OnCame
                 new String[]{Manifest.permission.CAMERA},
                 1);
     }
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
@@ -80,5 +74,10 @@ public class EyeActivity extends AppCompatActivity implements SmartCamera.OnCame
 
     private int getHeightScreen() {
         return getResources().getDisplayMetrics().heightPixels;
+    }
+
+    //TODO: timer for taking pictures
+    public void click(View view){
+        mCamera.takePicture();
     }
 }

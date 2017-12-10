@@ -7,8 +7,6 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import com.troshkova.portfolioprogect.visiondetector.R;
-
 import java.util.Locale;
 
 public class KeyboardActivity extends AppCompatActivity {
